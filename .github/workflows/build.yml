@@ -88,6 +88,31 @@ jobs:
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
+      - name: Check final module metadata
+        shell: bash
+        run: |
+          set -eu
+          z="build/youtube-revanced-module-v21.40.161-all.zip"
+
+          test -f "$z" || {
+            echo "Module ZIP not found: $z"
+            exit 1
+          }
+
+          echo "===== MODULE CONFIG ====="
+          unzip -p "$z" config
+
+          echo "===== MODULE PROPERTIES ====="
+          unzip -p "$z" module.prop
+
+          echo "===== INCLUDED APK FILES ====="
+          unzip -Z1 "$z" |
+            grep -E '(^|/)(base\.apk|stock/base\.apk)$' || true
+
+          echo "===== INSTALLED VERSION REFERENCES ====="
+          grep -nE 'PKG_VER|Version mismatch|versionName' \
+            module/utils.sh module/customize.sh
+
       - name: Locate build outputs
         shell: bash
         run: |
