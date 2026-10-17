@@ -21,30 +21,40 @@ jobs:
 
 
 
-      - name: Diagnose YouTube module versions
+
+      - name: Locate and diagnose module ZIP
         shell: bash
         run: |
           set -eu
-          shopt -s nullglob
-          found=0
 
-          for z in build/*module*.zip; do
-            found=1
-            echo "===== MODULE: $z ====="
-            echo "--- config ---"
-            unzip -p "$z" config || true
-            echo "--- module.prop ---"
-            unzip -p "$z" module.prop || true
-            echo "--- APK paths ---"
-            unzip -Z1 "$z" | grep -E '(^|/)(base\.apk|stock\.apk|module\.prop|config)$' || true
+          echo "===== ZIP FILES ====="
+          find . -type f -name '*.zip' \
+            -not -path './.git/*' \
+            -not -path './.gradle/*' \
+            -printf '%p (%s bytes)\n' | sort
+
+          echo "===== MODULE CANDIDATES ====="
+          find . -type f -name '*.zip' \
+            -not -path './.git/*' \
+            -not -path './.gradle/*' |
+          while IFS= read -r z; do
+            entries="$(unzip -Z1 "$z" 2>/dev/null || true)"
+            if printf '%s\n' "$entries" | grep -Eq '(^|/)module\.prop$'; then
+              echo "===== $z ====="
+              echo "--- config ---"
+              unzip -p "$z" config 2>/dev/null || true
+              echo "--- module.prop ---"
+              printf '%s\n' "$entries" | grep -E '(^|/)module\.prop$' |
+              while IFS= read -r p; do
+                echo "Path: $p"
+                unzip -p "$z" "$p" 2>/dev/null || true
+              done
+              echo "--- APK paths ---"
+              printf '%s\n' "$entries" |
+                grep -E '(^|/)(base\.apk|stock\.apk|.*youtube.*\.apk)$' || true
+            fi
           done
 
-          if [ "$found" -eq 0 ]; then
-            echo "No module ZIP found under build/"
-            echo "Available ZIP files:"
-            find . -type f -name '*.zip' -not -path './.git/*' | head -30
-         
-          fi
 
       - name: Checkout
         uses: actions/checkout@v6
