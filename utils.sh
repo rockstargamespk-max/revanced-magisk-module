@@ -644,16 +644,15 @@ patch_apk() {
 	local tmp_files
 	tmp_files="$(pwd)/$(mktemp -d -p "$TEMP_DIR")"
 
-	local cli_name verify_args=""
+	local cli_name bundle_args="-p"
 	cli_name=$(basename "$cli_jar")
 	if [ "${cli_name::8}" = "revanced" ]; then
-		# ReVanced CLI 6 requires an explicit verification choice for each RVP bundle.
-		# Put -b in the command while it is constructed; post-construction replacement
-		# is unreliable because $patches_jar has already been expanded.
-		verify_args=" -b"
+		# ReVanced CLI 6 groups the verification choice with each RVP input.
+		# Use the documented -bp form (bypass verification + patch bundle).
+		bundle_args="-bp"
 	fi
 
-	local cmd="java -jar '$cli_jar' patch '$stock_input' -o '$patched_apk' -p '$patches_jar'$verify_args --keystore=ks.keystore \
+	local cmd="java -jar '$cli_jar' patch '$stock_input' -o '$patched_apk' $bundle_args '$patches_jar' --keystore=ks.keystore \
 --keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc -t '$tmp_files' $patcher_args"
 
 	if [ "${cli_name::8}" = "revanced" ]; then
@@ -850,13 +849,8 @@ build_rv() {
 				dlurl=$(jq -e -r '.assets[0] | .browser_download_url' <<<"$resp") || return 1
 				gh_dl $p "$dlurl" >/dev/null || return 1
 			fi
-			# ReVanced CLI 6 requires a verification choice for every RVP-style -p argument.
-			# The j-hc update-check patch is supplied as a second patch bundle.
-			if [[ "$(basename "${args[cli]}")" == revanced* ]]; then
-				patcher_args+=("-p '$p' -b")
-			else
-				patcher_args+=("-p '$p'")
-			fi
+			# This legacy update-check bundle is currently only used with Morphe CLI.
+			patcher_args+=("-p '$p'")
 
 			local v
 			v=$(git tag --sort=committerdate | tail -1) || :
