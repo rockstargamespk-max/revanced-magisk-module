@@ -6,12 +6,16 @@ parallel-jobs = 1
 
 # you can use rvmm-config-gen to generate a config
 
-[YouTube-Morphe]
+[YouTube-ReVanced]
 app-name = "YouTube"
-patches-source = "MorpheApp/morphe-patches"
-cli-source = "MorpheApp/morphe-cli"
-rv-brand = "Morphe"
+patches-source = "ReVanced/revanced-patches"
+cli-source = "ReVanced/revanced-cli"
+rv-brand = "ReVanced"
 build-mode = "both"
+# "latest" selects the newest version listed by the configured download source,
+# even if the current patches do not declare compatibility with it.
+# This does not query Google Play directly; APKMirror is the primary source.
+version = "latest"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 enable-update-checks = true
