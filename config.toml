@@ -12,10 +12,10 @@ patches-source = "ReVanced/revanced-patches"
 cli-source = "ReVanced/revanced-cli"
 rv-brand = "ReVanced"
 build-mode = "both"
-# "latest" selects the newest version listed by the configured download source,
-# even if the current patches do not declare compatibility with it.
-# This does not query Google Play directly; APKMirror is the primary source.
-version = "latest"
+# "auto" selects the newest YouTube version declared compatible by the selected patches.
+# "latest" can force an unsupported APK and may produce an app that crashes on launch.
+# APKMirror is the download source; this does not query Google Play directly.
+version = "auto"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 enable-update-checks = true
