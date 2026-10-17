@@ -77,6 +77,25 @@ gh_release_metadata() {
 		fi
 	fi
 	[ "$ver" = "dev" ] && { epr "GitHub API is required to enumerate dev releases for ${src}"; return 1; }
+
+	# ReVanced's official API provides current patch-bundle metadata independently
+	# of GitHub's REST API and HTML release pages (both can be blocked by CI proxies).
+	if [ "$src" = "ReVanced/revanced-patches" ] && [ "$ver" = "latest" ]; then
+		local rv_api rv_tag rv_url rv_name
+		for rv_api in "https://api.revanced.app/v5/patches" "https://api.revanced.app/v4/patches"; do
+			page=$(req "$rv_api" - 2>/dev/null) || continue
+			rv_tag=$(jq -r '.data.version.value // .version.value // .data.version // .version // empty' <<<"$page" 2>/dev/null)
+			rv_url=$(jq -r '.data.downloadUrl // .downloadUrl // .data.download_url // .download_url // empty' <<<"$page" 2>/dev/null)
+			if [ -n "$rv_tag" ] && [ -n "$rv_url" ] && [ "$rv_url" != "null" ]; then
+				rv_name=${rv_url%%\?*}
+				rv_name=${rv_name##*/}
+				jq -cn --arg tag "v${rv_tag#v}" --arg name "$rv_name" --arg url "$rv_url" \
+					'{tag_name:$tag,assets:[{name:$name,browser_download_url:$url,url:$url}]}'
+				return 0
+			fi
+		done
+		wpr "Official ReVanced API did not return patch download metadata; trying GitHub release pages"
+	fi
 	wpr "GitHub API unavailable for ${src}; parsing public GitHub release page"
 	if [ "$ver" = "latest" ]; then
 		page=$(req "https://github.com/${src}/releases/latest" - 2>/dev/null) || { epr "Could not read public release page for ${src}"; return 1; }
