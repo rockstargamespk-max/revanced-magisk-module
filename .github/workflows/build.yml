@@ -8,6 +8,12 @@ on:
         default: true
 
   workflow_dispatch:
+    inputs:
+      rebuild_note:
+        description: "Optional note for this manual build (does not change build settings)"
+        required: false
+        type: string
+        default: "manual"
 
 jobs:
   run:
@@ -51,52 +57,36 @@ jobs:
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
-      - name: Locate and verify YouTube APKs
+      - name: Validate APK and module artifacts
         shell: bash
         run: |
-          set -eu
-
-          echo "===== WORKING DIRECTORY ====="
-          pwd
-
-          echo "===== FIND BUILD OUTPUTS ====="
-          find . -type f \( \
-            -name '*module*.zip' -o \
-            -name '*revanced*.apk' -o \
-            -name 'base.apk' \
-          \) -print | head -100
-
-          ZIP="$(find . -type f -name 'youtube-revanced-module-*-all.zip' -print -quit)"
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: Module ZIP not found."
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(build/*.apk)
+          modules=(build/*module*.zip)
+          if ((${#apks[@]} == 0)); then
+            echo "::error::No APK outputs were produced"
             exit 1
           fi
-
-          echo "===== MODULE ZIP: $ZIP ====="
-          unzip -p "$ZIP" config
-          echo
-          echo "===== APK FILES INSIDE MODULE ====="
-          unzip -Z1 "$ZIP" | grep -E '(^|/)(base\.apk|stock/base\.apk)$' || true
-
-          mkdir -p /tmp/rv-check
-          unzip -p "$ZIP" base.apk > /tmp/rv-check/patched.apk
-          unzip -p "$ZIP" stock/base.apk > /tmp/rv-check/stock.apk
-
-          echo "===== SDK TOOL LOCATIONS ====="
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-unset}"
-          command -v aapt || true
-          command -v aapt2 || true
-          command -v apkanalyzer || true
-
-          echo "===== APK SIZES ====="
-          ls -lh /tmp/rv-check/patched.apk /tmp/rv-check/stock.apk
-
-          echo "===== APK MANIFEST STRINGS ====="
-          for apk in /tmp/rv-check/patched.apk /tmp/rv-check/stock.apk; do
-            echo "--- $apk ---"
-            unzip -p "$apk" AndroidManifest.xml | strings | \
-              grep -E 'versionName|versionCode|com\.google\.android\.youtube' | head -20 || true
+          for apk in "${apks[@]}"; do
+            echo "Validating $apk"
+            unzip -t "$apk" >/dev/null
+            if command -v apksigner >/dev/null 2>&1; then
+              apksigner verify --verbose "$apk"
+            fi
+            if command -v aapt >/dev/null 2>&1; then
+              aapt dump badging "$apk" | grep -E "^(package:|sdkVersion:|targetSdkVersion:)" | head -n 3
+            fi
+          done
+          for module in "${modules[@]}"; do
+            echo "Validating $module"
+            unzip -t "$module" >/dev/null
+            unzip -Z1 "$module" | grep -qx 'base.apk' || { echo "::error::base.apk missing from $module"; exit 1; }
+            unzip -p "$module" base.apk > "$RUNNER_TEMP/module-base.apk"
+            unzip -t "$RUNNER_TEMP/module-base.apk" >/dev/null
+            if command -v apksigner >/dev/null 2>&1; then
+              apksigner verify --verbose "$RUNNER_TEMP/module-base.apk"
+            fi
           done
 
       - name: Get output
