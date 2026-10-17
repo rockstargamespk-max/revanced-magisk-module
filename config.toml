@@ -1,0 +1,77 @@
+enable-module-update = true # set this to false if you do not want to receive updates for the module
+parallel-jobs = 1
+
+# add 'enabled = false' for not patching a specific app or remove it from the config
+# see https://github.com/j-hc/revanced-magisk-module/blob/main/CONFIG.md for more detailed explanations
+
+# you can use rvmm-config-gen to generate a config
+
+[YouTube-ReVanced]
+app-name = "YouTube"
+patches-source = "anddea/revanced-patches"
+cli-source = "ReVanced/revanced-cli"
+rv-brand = "ReVanced"
+build-mode = "both"
+# "latest" selects the newest version listed by the configured download source,
+# even if the current patches do not declare compatibility with it.
+# This does not query Google Play directly; APKMirror is the primary source.
+version = "latest"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+enable-update-checks = true
+
+[Music-Morphe]
+app-name = "Music"
+patches-source = "MorpheApp/morphe-patches"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Morphe"
+build-mode = "both"
+arch = "both"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music"
+enable-update-checks = true
+
+[Reddit-Morphe]
+app-name = "Reddit"
+rv-brand = "Morphe"
+build-mode = "both"
+patches-source = "MorpheApp/morphe-patches"
+cli-source = "MorpheApp/morphe-cli"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/redditinc/reddit/"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.reddit.frontpage"
+dpi = "120-640dpi"
+
+[GooglePhotos]
+build-mode = "both"
+patches-source = "RookieEnough/De-Vanced"
+rv-brand = "DeVanced"
+cli-source = "MorpheApp/morphe-cli"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/photos/"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.photos"
+enable-update-checks = true
+
+[Twitter]
+patches-source = "crimera/piko-newx"
+cli-source = "MorpheApp/morphe-cli"
+rv-brand = "Piko"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.twitter.android"
+version = "latest"
+included-patches = "'NewX: Restore Twitter branding'"
+enable-update-checks = true
+
+[Music]
+enabled = false
+build-mode = "both"
+arch = "both"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube-music"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.apps.youtube.music"
+
+[YouTube]
+enabled = false
+build-mode = "both"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+
+[Twitch]
+enabled = false
+apkmirror-dlurl = "https://www.apkmirror.com/apk/twitch-interactive-inc/twitch/"
