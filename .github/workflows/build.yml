@@ -81,6 +81,24 @@ jobs:
           if [ -z "$TAG" ]; then TAG=0; fi
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
+      - name: Verify YouTube APK versions
+        shell: bash
+        run: |
+          set -eu
+
+          echo "===== PATCHED APK ====="
+          aapt dump badging build/youtube-revanced-v21.40.161-all.apk \
+            | grep -m1 "^package:"
+
+          echo "===== STOCK APK INSIDE MODULE ====="
+          unzip -p build/youtube-revanced-module-v21.40.161-all.zip \
+            stock/base.apk > /tmp/youtube-stock.apk
+          aapt dump badging /tmp/youtube-stock.apk \
+            | grep -m1 "^package:"
+
+          echo "===== FINAL MODULE CONFIG ====="
+          unzip -p build/youtube-revanced-module-v21.40.161-all.zip config
+
       - name: Build modules/APKs
         run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
         env:
