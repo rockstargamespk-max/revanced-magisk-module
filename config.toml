@@ -14,10 +14,12 @@ rv-brand = "ReVanced"
 build-mode = "both"
 # "auto" selects the newest YouTube version declared compatible by the selected patches.
 # "latest" can force an unsupported APK and may produce an app that crashes on launch.
-# APKMirror is the download source; this does not query Google Play directly.
+# Uses Uptodown first, then the archive and APKMirror as fallbacks.
+# "auto" selects the newest YouTube version declared compatible by the selected patches.
 version = "auto"
-apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
+uptodown-dlurl = "https://youtube.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 enable-update-checks = true
 
 [Music-Morphe]
