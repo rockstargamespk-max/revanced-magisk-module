@@ -580,8 +580,30 @@ dl_uptodown() {
 		if [ $n -eq 12 ]; then return 1; fi
 	fi
 	local data_url
-	data_url=$($HTMLQ "#detail-download-button" --attribute data-url <<<"$resp") || return 1
+	data_url=$($HTMLQ "#detail-download-button" --attribute data-url <<<"$resp") || data_url=""
 	if [ -z "$data_url" ] || [ "$data_url" = "null" ]; then
+		# Uptodown changed its download page: the older version page exposes a
+		# download path in the version list, followed by a post-download token.
+		# Keep the JSON flow above as the primary path and use this HTML flow as
+		# a fallback instead of failing immediately when data-url is absent.
+		local legacy_path legacy_resp legacy_token
+		legacy_path=$(grep -F "${version}</span>" -B 2 <<<"$__UPTODOWN_RESP__" | head -1 | sed -n 's;.*data-url=".*download/\([^" ]*\)".*;\1;p')
+		if [ -n "$legacy_path" ]; then
+			legacy_resp=$(req "${uptodown_dlurl}/download/${legacy_path}" -) || legacy_resp=""
+			legacy_token=$($HTMLQ ".post-download" --attribute data-url <<<"$legacy_resp" 2>/dev/null) || legacy_token=""
+			if [ -z "$legacy_token" ] || [ "$legacy_token" = "null" ]; then
+				legacy_token=$($HTMLQ "#detail-download-button" --attribute data-url <<<"$legacy_resp" 2>/dev/null) || legacy_token=""
+			fi
+			if [ -n "$legacy_token" ] && [ "$legacy_token" != "null" ]; then
+				if [ "$is_bundle" = true ]; then
+					req "https://dw.uptodown.com/dwn/${legacy_token}" "$output.apkm" || return 1
+					merge_splits "${output}.apkm" "${output}"
+				else
+					req "https://dw.uptodown.com/dwn/${legacy_token}" "$output"
+				fi
+				return $?
+			fi
+		fi
 		epr "Uptodown did not provide a download token for YouTube version $version; trying the next source."
 		return 1
 	fi
