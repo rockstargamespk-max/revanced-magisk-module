@@ -19,39 +19,6 @@ jobs:
           distribution: "zulu"
           java-version: "21"
 
-      - name: Locate and diagnose module ZIP
-        shell: bash
-        run: |
-          set -eu
-
-          echo "===== ZIP FILES ====="
-          find . -type f -name '*.zip' \
-            -not -path './.git/*' \
-            -not -path './.gradle/*' \
-            -printf '%p (%s bytes)\n' | sort
-
-          echo "===== MODULE CANDIDATES ====="
-          find . -type f -name '*.zip' \
-            -not -path './.git/*' \
-            -not -path './.gradle/*' |
-          while IFS= read -r z; do
-            entries="$(unzip -Z1 "$z" 2>/dev/null || true)"
-            if printf '%s\n' "$entries" | grep -Eq '(^|/)module\.prop$'; then
-              echo "===== $z ====="
-              echo "--- config ---"
-              unzip -p "$z" config 2>/dev/null || true
-              echo "--- module.prop ---"
-              printf '%s\n' "$entries" | grep -E '(^|/)module\.prop$' |
-              while IFS= read -r p; do
-                echo "Path: $p"
-                unzip -p "$z" "$p" 2>/dev/null || true
-              done
-              echo "--- APK paths ---"
-              printf '%s\n' "$entries" |
-                grep -E '(^|/)(base\.apk|stock\.apk|.*youtube.*\.apk)$' || true
-            fi
-          done
-
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -77,100 +44,12 @@ jobs:
           if [ -z "$TAG" ]; then TAG=0; fi
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
- - name: Locate and verify YouTube APKs
-        shell: bash
-        run: |
-          set -eu
-
-          echo "===== WORKING DIRECTORY ====="
-          pwd
-
-          echo "===== FIND BUILD OUTPUTS ====="
-          find . -type f \( \
-            -name '*module*.zip' -o \
-            -name '*revanced*.apk' -o \
-            -name 'base.apk' \
-          \) -print | head -100
-
-          ZIP="$(find . -type f -name 'youtube-revanced-module-*-all.zip' -print -quit)"
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: Module ZIP not found."
-            exit 1
-          fi
-
-          echo "===== MODULE ZIP: $ZIP ====="
-          unzip -p "$ZIP" config
-          echo
-          echo "===== APK FILES INSIDE MODULE ====="
-          unzip -Z1 "$ZIP" | grep -E '(^|/)(base\.apk|stock/base\.apk)$' || true
-
-          mkdir -p /tmp/rv-check
-          unzip -p "$ZIP" base.apk > /tmp/rv-check/patched.apk
-          unzip -p "$ZIP" stock/base.apk > /tmp/rv-check/stock.apk
-
-          echo "===== SDK TOOL LOCATIONS ====="
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-unset}"
-          command -v aapt || true
-          command -v aapt2 || true
-          command -v apkanalyzer || true
-
-          echo "===== APK SIZES ====="
-          ls -lh /tmp/rv-check/patched.apk /tmp/rv-check/stock.apk
-
-          echo "===== APK MANIFEST STRINGS ====="
-          for apk in /tmp/rv-check/patched.apk /tmp/rv-check/stock.apk; do
-            echo "--- $apk ---"
-            unzip -p "$apk" AndroidManifest.xml | strings | \
-              grep -E 'versionName|versionCode|com\.google\.android\.youtube' | head -20 || true
-          done
-
       - name: Build modules/APKs
         run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
-
-      - name: Check final module metadata
-        shell: bash
-        run: |
-          set -eu
-          z="build/youtube-revanced-module-v21.40.161-all.zip"
-
-          test -f "$z" || {
-            echo "Module ZIP not found: $z"
-            exit 1
-          }
-
-          echo "===== MODULE CONFIG ====="
-          unzip -p "$z" config
-
-          echo "===== MODULE PROPERTIES ====="
-          unzip -p "$z" module.prop
-
-          echo "===== INCLUDED APK FILES ====="
-          unzip -Z1 "$z" |
-            grep -E '(^|/)(base\.apk|stock/base\.apk)$' || true
-
-          echo "===== INSTALLED VERSION REFERENCES ====="
-          grep -nE 'PKG_VER|Version mismatch|versionName' \
-            module/utils.sh module/customize.sh
-
-      - name: Locate build outputs
-        shell: bash
-        run: |
-          echo "===== CURRENT DIRECTORY ====="
-          pwd
-          echo "===== ROOT CONTENTS ====="
-          ls -lah
-          echo "===== BUILD SCRIPT OUTPUT REFERENCES ====="
-          grep -nEi 'zip|output|module|artifact|dist|package' build.sh
-          echo "===== RECENT OUTPUT FILES ====="
-          find . -maxdepth 5 -type f \
-            \( -name '*.zip' -o -name '*.apk' -o -name 'module.prop' -o -name 'config' \) \
-            -not -path './.git/*' -printf '%p (%s bytes)\n' | head -10
-            0
 
       - name: Get output
         id: get_output
