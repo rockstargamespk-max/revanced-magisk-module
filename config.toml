@@ -21,7 +21,7 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 enable-update-checks = true
 
 [Music-Morphe]
-enabled = false
+enabled = false # disabled: build only YouTube ReVanced
 app-name = "Music"
 patches-source = "MorpheApp/morphe-patches"
 cli-source = "MorpheApp/morphe-cli"
@@ -33,7 +33,7 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.a
 enable-update-checks = true
 
 [Reddit-Morphe]
-enabled = false
+enabled = false # disabled: build only YouTube ReVanced
 app-name = "Reddit"
 rv-brand = "Morphe"
 build-mode = "both"
@@ -44,7 +44,7 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.reddit.frontpage
 dpi = "120-640dpi"
 
 [GooglePhotos]
-enabled = false
+enabled = false # disabled: build only YouTube ReVanced
 build-mode = "both"
 patches-source = "RookieEnough/De-Vanced"
 rv-brand = "DeVanced"
@@ -54,7 +54,7 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.a
 enable-update-checks = true
 
 [Twitter]
-enabled = false
+enabled = false # disabled: build only YouTube ReVanced
 patches-source = "crimera/piko-newx"
 cli-source = "MorpheApp/morphe-cli"
 rv-brand = "Piko"
