@@ -651,7 +651,9 @@ patch_apk() {
 	local cli_name
 	cli_name=$(basename "$cli_jar")
 	if [ "${cli_name::8}" = "revanced" ]; then
-		cmd+=" -b"
+		# Current ReVanced CLI groups -b with the preceding -p RVP argument.
+		# Place it immediately after the patches path rather than at command end.
+		cmd="${cmd/ -p '$patches_jar'/ -p '$patches_jar' -b}"
 		if [ "$OS" = "Android" ]; then cmd+=" --custom-aapt2-binary='${AAPT2}'"; fi
 	fi
 
