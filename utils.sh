@@ -846,7 +846,13 @@ build_rv() {
 				dlurl=$(jq -e -r '.assets[0] | .browser_download_url' <<<"$resp") || return 1
 				gh_dl $p "$dlurl" >/dev/null || return 1
 			fi
-			patcher_args+=("-p '$p'")
+			# ReVanced CLI 6 requires a verification choice for every RVP-style -p argument.
+			# The j-hc update-check patch is supplied as a second patch bundle.
+			if [[ "$(basename "${args[cli]}")" == revanced* ]]; then
+				patcher_args+=("-p '$p' -b")
+			else
+				patcher_args+=("-p '$p'")
+			fi
 
 			local v
 			v=$(git tag --sort=committerdate | tail -1) || :
