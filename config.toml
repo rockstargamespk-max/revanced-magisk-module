@@ -9,7 +9,8 @@ parallel-jobs = 1
 [YouTube-ReVanced]
 app-name = "YouTube"
 patches-source = "anddea/revanced-patches"
-cli-source = "ReVanced/revanced-cli"
+# Anddea .mpp bundles use Morphe patcher classes; pair them with Morphe CLI, not ReVanced CLI.
+cli-source = "MorpheApp/morphe-cli"
 rv-brand = "ReVanced"
 build-mode = "both"
 # Select the newest version declared compatible by Anddea patches; do not force the Play Store's newest APK if patches do not support it.
