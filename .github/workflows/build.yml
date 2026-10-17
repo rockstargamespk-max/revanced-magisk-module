@@ -19,6 +19,37 @@ jobs:
           distribution: "zulu"
           java-version: "21"
 
+
+      - name: Diagnose YouTube module versions
+        shell: bash
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq aapt unzip
+
+          for z in build/*module*.zip; do
+            [ -f "$z" ] || continue
+            echo "===== MODULE: $z ====="
+            echo "--- config ---"
+            unzip -p "$z" config || true
+            echo "--- module.prop ---"
+            unzip -p "$z" module.prop || true
+
+            d="$(mktemp -d)"
+            unzip -p "$z" base.apk > "$d/base.apk"
+            echo "--- PATCHED APK VERSION ---"
+            aapt dump badging "$d/base.apk" |
+              grep -m1 '^package:'
+            if unzip -l "$z" | grep -q 'stock/base.apk'; then
+              unzip -p "$z" stock/base.apk > "$d/stock.apk"
+              echo "--- STOCK APK VERSION ---"
+              aapt dump badging "$d/stock.apk" |
+                grep -m1 '^package:'
+            fi
+            rm -rf "$d"
+          d
+          one
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
