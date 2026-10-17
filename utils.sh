@@ -65,6 +65,30 @@ java() {
 	fi
 }
 
+# GitHub API may return HTTP 451 in some runner/network regions. Fall back to
+# the public release HTML page and synthesize the small JSON shape used below.
+gh_release_html_fallback() {
+    local repo="$1" selector="$2" page tag html assets
+    if [ "$selector" = "latest" ] || [ "$selector" = "dev" ]; then
+        page="https://github.com/${repo}/releases/latest"
+    else
+        page="https://github.com/${repo}/releases/tag/${selector}"
+    fi
+    html=$(curl -fLsS --connect-timeout 10 --retry 1 -H "User-Agent: Mozilla/5.0" "$page") || return 1
+    tag=$(grep -oE '"tag_name":"[^"]+"' <<<"$html" | head -1 | sed -E 's/.*"tag_name":"([^"]+)".*/\1/')
+    if [ -z "$tag" ]; then
+        tag=$(grep -oE '/'"${repo}"'/releases/tag/[^"?]+' <<<"$html" | head -1 | sed 's#.*/tag/##')
+    fi
+    [ -n "$tag" ] || return 1
+    assets=$(grep -oE 'href="/'"${repo}"'/releases/download/[^" ]+' <<<"$html" | sed -E 's/^href="//; s/&amp;/\&/g' | sort -u | while IFS= read -r path; do
+        name=${path##*/}
+        case "$name" in *.asc|*.json) continue ;; esac
+        printf '{"name":%s,"url":%s},' "$(jq -Rn --arg v "$name" '$v')" "$(jq -Rn --arg v "https://github.com${path}" '$v')"
+    done | sed 's/,$//')
+    [ -n "$assets" ] || return 1
+    jq -cn --arg tag "$tag" --argjson assets "[$assets]" '{tag_name:$tag,assets:$assets}'
+}
+
 get_prebuilts() {
 	local cli_src=$1 cli_ver=$2 patches_src=$3 patches_ver=$4
 	pr "Getting prebuilts (${patches_src%/*})" >&2
@@ -111,7 +135,13 @@ get_prebuilts() {
 		fi
 		if [ -z "$file" ]; then
 			local resp asset name
-			resp=$(gh_req "$rv_rel" -) || return 1
+			if ! resp=$(gh_req "$rv_rel" -); then
+				wpr "GitHub API unavailable for ${src}; trying public release page fallback"
+				resp=$(gh_release_html_fallback "$src" "$ver") || {
+					epr "Could not read release metadata from GitHub API or release page: ${src} (${ver})"
+					return 1
+				}
+			fi
 			tag_name=$(jq -r '.tag_name' <<<"$resp") || return 1
 			matches=$(jq -e '.assets | map(select(.name | (endswith("asc") or endswith("json")) | not))' <<<"$resp") || return 1
 			if [ "$(jq 'length' <<<"$matches")" -gt 1 ]; then
