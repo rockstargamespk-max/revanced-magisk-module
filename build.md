@@ -1,11 +1,11 @@
-YouTube-ReVanced: 21.40.161  
+YouTube-ReVanced: 21.13.164  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
 Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store  
 
 [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)
   
-Patches: ReVanced/revanced-patches/patches-latest.rvp  
-[Changelog](https://github.com/ReVanced/revanced-patches/releases/tag/vlatest)
+Patches: anddea/revanced-patches/patches-4.3.0.mpp  
+[Changelog](https://github.com/anddea/revanced-patches/releases/tag/v4.3.0)
 
-CLI: ReVanced/revanced-cli/revanced-cli-6.0.0-all.jar    
+CLI: MorpheApp/morphe-cli/morphe-desktop-1.18.1-all.jar    
