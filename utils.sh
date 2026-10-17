@@ -581,6 +581,10 @@ dl_uptodown() {
 	fi
 	local data_url
 	data_url=$($HTMLQ "#detail-download-button" --attribute data-url <<<"$resp") || return 1
+	if [ -z "$data_url" ] || [ "$data_url" = "null" ]; then
+		epr "Uptodown did not provide a download token for YouTube version $version; trying the next source."
+		return 1
+	fi
 	if [ $is_bundle = true ]; then
 		req "https://dw.uptodown.com/dwn/${data_url}" "$output.apkm" || return 1
 		merge_splits "${output}.apkm" "${output}"
