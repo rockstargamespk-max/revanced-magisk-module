@@ -78,8 +78,16 @@ gh_release_metadata() {
 	fi
 	[ "$ver" = "dev" ] && { epr "GitHub API is required to enumerate dev releases for ${src}"; return 1; }
 
-	# ReVanced's official API provides current patch-bundle metadata independently
-	# of GitHub's REST API and HTML release pages (both can be blocked by CI proxies).
+	# The official API serves the current .rvp directly. Download it directly instead
+	# of requiring metadata endpoints, which can be blocked or return a changed schema.
+	if [ "$src" = "ReVanced/revanced-patches" ] && [ "$ver" = "latest" ]; then
+		jq -cn --arg tag "vlatest" --arg name "patches-latest.rvp" \
+			--arg url "https://api.revanced.app/v5/patches.rvp" \
+			'{tag_name:$tag,assets:[{name:$name,browser_download_url:$url,url:$url}]}'
+		return 0
+	fi
+
+	# ReVanced's official API may also provide metadata on some API versions.
 	if [ "$src" = "ReVanced/revanced-patches" ] && [ "$ver" = "latest" ]; then
 		local rv_api rv_tag rv_url rv_name
 		for rv_api in "https://api.revanced.app/v5/patches" "https://api.revanced.app/v4/patches"; do
