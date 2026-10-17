@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+in/env bash
 
 MODULE_TEMPLATE_DIR="module"
 CWD=$(pwd)
@@ -644,16 +644,20 @@ patch_apk() {
 	local tmp_files
 	tmp_files="$(pwd)/$(mktemp -d -p "$TEMP_DIR")"
 
-	local cmd="java -jar '$cli_jar' patch '$stock_input' -o '$patched_apk' -p '$patches_jar' --keystore=ks.keystore \
---keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc -t '$tmp_files' $patcher_args"
-
-	# TODO: remove this later
-	local cli_name
+	local cli_name verify_args=""
 	cli_name=$(basename "$cli_jar")
 	if [ "${cli_name::8}" = "revanced" ]; then
-		# ReVanced CLI 6 requires a verification choice for the main RVP bundle.
-		# Keep bypass immediately after this -p; the legacy MPP patch is skipped for this CLI.
-		cmd="${cmd/ -p '$patches_jar'/ -p '$patches_jar' -b}"
+		# ReVanced CLI 6 requires an explicit verification choice for each RVP bundle.
+		# Put -b in the command while it is constructed; post-construction replacement
+		# is unreliable because $patches_jar has already been expanded.
+		verify_args=" -b"
+	fi
+
+	local cmd="java -jar '$cli_jar' patch '$stock_input' -o '$patched_apk' -p '$patches_jar'$verify_args --keystore=ks.keystore \
+--keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc -t '$tmp_files' $patcher_args"
+
+	if [ "${cli_name::8}" = "revanced" ]; then
+		# The legacy MPP update-check patch is skipped for this CLI.
 		if [ "$OS" = "Android" ]; then cmd+=" --custom-aapt2-binary='${AAPT2}'"; fi
 	fi
 
