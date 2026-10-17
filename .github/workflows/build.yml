@@ -88,6 +88,21 @@ jobs:
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
 
+      - name: Locate build outputs
+        shell: bash
+        run: |
+          echo "===== CURRENT DIRECTORY ====="
+          pwd
+          echo "===== ROOT CONTENTS ====="
+          ls -lah
+          echo "===== BUILD SCRIPT OUTPUT REFERENCES ====="
+          grep -nEi 'zip|output|module|artifact|dist|package' build.sh
+          echo "===== RECENT OUTPUT FILES ====="
+          find . -maxdepth 5 -type f \
+            \( -name '*.zip' -o -name '*.apk' -o -name 'module.prop' -o -name 'config' \) \
+            -not -path './.git/*' -printf '%p (%s bytes)\n' | head -10
+            0
+
       - name: Get output
         id: get_output
         run: |
