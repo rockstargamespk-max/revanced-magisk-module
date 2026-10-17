@@ -65,6 +65,37 @@ java() {
 	fi
 }
 
+# GitHub API may be blocked (for example HTTP 451) while github.com release pages
+# remain accessible. Reconstruct the small release metadata subset used below.
+gh_release_metadata() {
+	local src="$1" ver="$2" api="https://api.github.com/repos/${1}/releases" page tag assets_json
+	if [ "$ver" = "latest" ]; then api+="/latest"; elif [ "$ver" != "dev" ]; then api+="/tags/${ver}"; fi
+	if [ "$ver" != "dev" ] && page=$(gh_req "$api" - 2>/dev/null); then
+		if jq -e '(.tag_name != null) and (.assets != null)' >/dev/null 2>&1 <<<"$page"; then
+			printf '%s' "$page"
+			return 0
+		fi
+	fi
+	[ "$ver" = "dev" ] && { epr "GitHub API is required to enumerate dev releases for ${src}"; return 1; }
+	wpr "GitHub API unavailable for ${src}; parsing public GitHub release page"
+	if [ "$ver" = "latest" ]; then
+		page=$(req "https://github.com/${src}/releases/latest" - 2>/dev/null) || { epr "Could not read public release page for ${src}"; return 1; }
+		tag=$(grep -oE "/${src}/releases/tag/[^\"?# ]+" <<<"$page" | head -1 | sed "s#^/${src}/releases/tag/##")
+	else
+		tag=${ver#v}
+		tag="v${tag}"
+		page=$(req "https://github.com/${src}/releases/tag/${tag}" - 2>/dev/null) || { epr "Could not read release tag ${tag} for ${src}"; return 1; }
+	fi
+	[ -n "$tag" ] || { epr "Could not determine latest release tag for ${src}"; return 1; }
+	assets=$(req "https://github.com/${src}/releases/expanded_assets/${tag}" - 2>/dev/null) || { epr "Could not list release assets for ${src} ${tag}"; return 1; }
+	assets_json=$(grep -oE "/${src}/releases/download/${tag}/[^\"?# ]+" <<<"$assets" | sed "s#^#https://github.com#" | sort -u | while IFS= read -r url; do
+		name=${url##*/}
+		case "$name" in *.asc|*.json) continue ;; esac
+		jq -cn --arg name "$name" --arg url "$url" '{name:$name,browser_download_url:$url,url:$url}'
+	done | jq -s '.') || return 1
+	jq -cn --arg tag "$tag" --argjson assets "$assets_json" '{tag_name:$tag,assets:$assets}'
+}
+
 get_prebuilts() {
 	local cli_src=$1 cli_ver=$2 patches_src=$3 patches_ver=$4
 	pr "Getting prebuilts (${patches_src%/*})" >&2
@@ -111,40 +142,8 @@ get_prebuilts() {
 		fi
 		if [ -z "$file" ]; then
 			local resp asset name
-			if ! resp=$(gh_req "$rv_rel" -); then
-				# ReVanced's GitHub release API may return HTTP 451 in some regions.
-				# SourceForge mirrors the official ReVanced patches .rvp artifacts.
-				if [ "$tag" = "Patches" ]; then
-					wpr "GitHub release metadata unavailable; trying the SourceForge ReVanced patches mirror"
-					local sf_page sf_tag sf_asset sf_url
-					sf_page=$(req "https://sourceforge.net/projects/revanced.mirror/files/" -) || return 1
-					sf_tag=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' <<<"$sf_page" | sort -Vu | tail -1)
-					[ -n "$sf_tag" ] || { epr "Could not determine latest patches version from SourceForge mirror"; return 1; }
-					if [ "$ver" != "latest" ] && [ "${ver#v}" != "${sf_tag#v}" ]; then sf_tag=$ver; fi
-					sf_asset="patches-${sf_tag#v}.rvp"
-					sf_url="https://sourceforge.net/projects/revanced.mirror/files/${sf_tag}/${sf_asset}/download"
-					file="${dir}/${sf_asset}"
-					if ! req "$sf_url" "$file"; then epr "SourceForge fallback failed for ${sf_asset}"; return 1; fi
-				tag_name=$sf_tag
-					grab_cl="true"
-					echo "Patches: ${src}/${sf_asset} (SourceForge mirror)  " >>"${cl_dir}/changelog.md"
-				elif [ "$tag" = "CLI" ] && [ "$src" = "ReVanced/revanced-cli" ] && { [ "$ver" = "latest" ] || [ "$ver" = "v6.0.0" ] || [ "$ver" = "6.0.0" ]; }; then
-					# Known stable CLI compatible with the current ReVanced patches line.
-					# This is a last-resort fallback only; normal builds still resolve latest via API.
-					wpr "GitHub API unavailable; falling back to ReVanced CLI v6.0.0"
-					tag_name="v6.0.0"
-					name="revanced-cli-6.0.0-all.jar"
-					url="https://github.com/ReVanced/revanced-cli/releases/download/v6.0.0/${name}"
-					file="${dir}/${name}"
-					gh_dl "$file" "$url" >&2 || return 1
-					echo "CLI: ${src}/${name} (fallback)  " >>"${cl_dir}/changelog.md"
-					grab_cl="false"
-				else
-					epr "Could not read release metadata: ${src}; GitHub API is unavailable and no safe mirror is configured for ${tag}"
-					return 1
-				fi
-			else
-				tag_name=$(jq -r '.tag_name' <<<"$resp") || return 1
+			resp=$(gh_release_metadata "$src" "$ver") || return 1
+			tag_name=$(jq -r '.tag_name' <<<"$resp") || return 1
 			matches=$(jq -e '.assets | map(select(.name | (endswith("asc") or endswith("json")) | not))' <<<"$resp") || return 1
 			if [ "$(jq 'length' <<<"$matches")" -gt 1 ]; then
 				local matches_new
@@ -170,7 +169,6 @@ get_prebuilts() {
 			file="${dir}/${name}"
 			gh_dl "$file" "$url" >&2 || return 1
 			echo "$tag: ${src}/${name}  " >>"${cl_dir}/changelog.md"
-			fi
 		else
 			local grab_cl="false"
 			name=$(basename "$file")
