@@ -1,6 +1,6 @@
 {
-  "version": "v21.13.164 (patches 4.3.0.mpp)",
-  "versionCode": 10,
-  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/10/youtube-anddea-module-v21.13.164-all.zip",
+  "version": "v21.13.164 (patches dev.2.mpp)",
+  "versionCode": 11,
+  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/11/youtube-anddea-module-v21.13.164-all.zip",
   "changelog": "https://raw.githubusercontent.com/rockstargamespk-max/revanced-magisk-module/update/build.md"
 }
