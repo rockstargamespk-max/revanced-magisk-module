@@ -1,6 +1,6 @@
 {
-  "version": "v21.20.405 (patches dev.13.mpp)",
-  "versionCode": 14,
-  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/14/youtube-revanced-extended-module-v21.20.405-arm64-v8a.zip",
+  "version": "v21.39.525 (patches lavin.1.mpp)",
+  "versionCode": 15,
+  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/15/youtube-revanced-extended-module-v21.39.525-arm64-v8a.zip",
   "changelog": "https://raw.githubusercontent.com/rockstargamespk-max/revanced-magisk-module/update/build.md"
 }
