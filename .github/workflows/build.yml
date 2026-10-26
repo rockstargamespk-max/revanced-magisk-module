@@ -1,0 +1,262 @@
+name: Build Modules
+on:
+  workflow_call:
+    inputs:
+      from_ci:
+        type: boolean
+        required: false
+        default: true
+      stock_apk_url:
+        description: "Direct URL to the original Google-signed YouTube APK or split bundle; version is detected from the APK"
+        type: string
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      patch_source:
+        description: "Patch repository to use for YouTube"
+        required: true
+        type: choice
+        default: Morphe
+        options:
+          - Morphe
+          - Anddea
+      stock_apk_url:
+        description: "Direct URL to the original Google-signed YouTube APK or split bundle; version is detected from the APK (optional)"
+        required: false
+        type: string
+
+jobs:
+  run:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Update config
+        if: ${{ inputs.from_ci }}
+        run: |
+          if git checkout origin/update build.md; then
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
+            if [ "$UPDATE_CFG" ]; then
+              echo "$UPDATE_CFG" > config.json
+            fi
+          fi
+
+      - name: Install Android APK metadata tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aapt
+
+      - name: Select patch source and resolve latest published release
+        shell: bash
+        env:
+          PATCH_SOURCE: ${{ inputs.patch_source || 'Morphe' }}
+        run: |
+          set -euo pipefail
+          case "$PATCH_SOURCE" in
+            Morphe)
+              PATCH_REPO="MorpheApp/morphe-patches"
+              RV_BRAND="Morphe"
+              ;;
+            Anddea)
+              PATCH_REPO="anddea/revanced-patches"
+              RV_BRAND="ReVanced Extended"
+              ;;
+            *)
+              echo "::error::Unsupported patch source: $PATCH_SOURCE"
+              exit 1
+              ;;
+          esac
+
+          RELEASE_JSON="$(curl --retry 3 --retry-all-errors --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${PATCH_REPO}/releases?per_page=100")"
+          # Include stable and prerelease releases. Ignore only drafts, and pick
+          # the newest published release by timestamp rather than filtering prereleases.
+          PATCH_TAG="$(printf '%s' "$RELEASE_JSON" | jq -er \
+            'map(select(.draft == false and (.tag_name | type == "string" and length > 0))) \
+             | sort_by(.published_at // .created_at) | reverse | first | .tag_name')"
+          if [ -z "$PATCH_TAG" ] || [ "$PATCH_TAG" = "null" ]; then
+            echo "::error::No published release found for ${PATCH_REPO}"
+            exit 1
+          fi
+          echo "Using latest published release: ${PATCH_REPO}@${PATCH_TAG}"
+
+          python3 - "$PATCH_REPO" "$PATCH_TAG" "$RV_BRAND" <<'PYCFG'
+          from pathlib import Path
+          import sys
+          repo, tag, brand = sys.argv[1:]
+          path = Path("config.toml")
+          text = path.read_text()
+          start = text.find("[YouTube-Morphe]")
+          if start < 0:
+              raise SystemExit("Missing [YouTube-Morphe] section in config.toml")
+          end = text.find("\n[", start + 1)
+          if end < 0:
+              end = len(text)
+          section = text[start:end]
+          values = {
+              "patches-source": repo,
+              "patches-version": tag,
+              "rv-brand": brand,
+              "version": "auto",
+          }
+          lines = section.splitlines()
+          for key, value in values.items():
+              replacement = f'{key} = "{value}"'
+              for i, line in enumerate(lines):
+                  if line.strip().startswith(key + " ="):
+                      lines[i] = replacement
+                      break
+              else:
+                  lines.append(replacement)
+          updated = "\n".join(lines)
+          path.write_text(text[:start] + updated + text[end:])
+          PYCFG
+
+          grep -Fq "patches-source = \"${PATCH_REPO}\"" config.toml
+          grep -Fq "patches-version = \"${PATCH_TAG}\"" config.toml
+          grep -Fq 'version = "auto"' config.toml
+          grep -Fq 'detect_custom_apk_metadata()' utils.sh
+          ! grep -Fq 'lavinhoque33/revanced-patches' config.toml
+          echo "Patch source: ${PATCH_REPO}"
+          echo "Patch release: ${PATCH_TAG}"
+          echo "Stock YouTube APK version will be detected from APK metadata."
+
+      - name: Get next version code
+        id: next_ver_code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}')
+          if [ -z "$TAG" ]; then TAG=0; fi
+          echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
+
+      - name: Explain stock APK source
+        if: ${{ inputs.stock_apk_url == '' }}
+        run: |
+          echo "No stock_apk_url was supplied. The build will try public mirrors, which may return HTTP 403."
+          echo "To bypass blocked mirrors, rerun this workflow manually and supply a direct URL to the original Google-signed YouTube APK or split bundle; its version will be detected automatically."
+
+      - name: Build modules/APKs
+        run: ./build.sh config.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+          NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          YOUTUBE_STOCK_APK_URL: ${{ inputs.stock_apk_url }}
+
+      - name: Get output
+        id: get_output
+        run: |
+          DELIM="$(openssl rand -hex 8)"
+          echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
+          cat build.md >> "$GITHUB_OUTPUT"
+          echo "${DELIM}" >> "$GITHUB_OUTPUT"
+          cp -f build.md build.tmp
+      
+      - name: Upload release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
+          BODY: ${{ steps.get_output.outputs.BUILD_LOG }}
+        run: |
+          ls -lh ./build/*
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Release" --notes "$BODY"
+            gh release upload "$TAG" ./build/* --clobber
+          else
+            gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
+          fi
+
+      - name: Update modules changelog and update json
+        id: update_config
+        run: |
+          git checkout -f update || git switch --discard-changes --orphan update
+          cp -f build.tmp build.md
+          get_update_json() {
+            echo "{
+            \"version\": \"$1\",
+            \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
+            \"zipUrl\": \"$2\",
+            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\"
+          }"
+          }
+
+          cd build || { echo "build folder not found"; exit 1; }
+          for OUTPUT in *module*.zip; do
+            [ "$OUTPUT" = "*module*.zip" ] && continue
+            ZIP_S=$(unzip -p "$OUTPUT" module.prop)
+            if ! UPDATE_JSON=$(echo "$ZIP_S" | grep updateJson); then continue; fi
+            UPDATE_JSON="${UPDATE_JSON##*/}"
+            VER=$(echo "$ZIP_S" | grep version=)
+            VER="${VER##*=}"
+            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
+          done
+          cd ..
+
+          find . -name "*-update.json" | grep . || : >dummy-update.json
+
+      - name: Commit module json changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+          git add build.md *-update.json
+      
+          if ! git diff --cached --quiet; then
+            git commit -m "Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+            git push origin HEAD:update
+          else
+            echo "no changes!"
+          fi
+
+      - name: Report to Telegram
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+        if: env.TG_TOKEN != null
+        run: |
+          cd build || { echo "build folder not found"; exit 1; }
+
+          TG_CHAT="@rvc_magisk"
+          NL=$'\n'
+          APKS=""
+          MODULES=""
+          for OUTPUT in *; do
+            DL_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
+            if [[ $OUTPUT = *.apk ]]; then
+              APKS+="${NL}📦[${OUTPUT}](${DL_URL})"
+            elif [[ $OUTPUT = *.zip ]]; then
+              MODULES+="${NL}📦[${OUTPUT}](${DL_URL})"
+            fi
+          done
+          if [ -n "$MODULES" ]; then
+            MODULES="Modules:${NL}${MODULES#"$NL"}"
+            if [ -n "$APKS" ]; then MODULES+=${NL}${NL}; fi
+          fi
+          if [ -n "$APKS" ]; then APKS="APKs:${NL}${APKS#"$NL"}"; fi
+
+          BODY="$(cat ../build.md)"
+          MSG="*New build!*
+
+          ${BODY}
+
+          *▼ Download Links:*
+          ${MODULES}${APKS}
+          "
+          echo "'$MSG'"
+          MSG=${MSG:0:9450}
+          POST="https://api.telegram.org/bot${TG_TOKEN}/sendMessage"
+          curl -X POST --data-urlencode "parse_mode=Markdown" --data-urlencode "disable_web_page_preview=true" --data-urlencode "text=${MSG}" --data-urlencode "chat_id=${TG_CHAT}" "$POST"
