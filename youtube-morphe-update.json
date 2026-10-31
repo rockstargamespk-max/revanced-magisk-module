@@ -1,6 +1,6 @@
 {
-  "version": "v21.44.523-BETA (patches dev.1.mpp)",
-  "versionCode": 21,
-  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/21/youtube-morphe-module-v21.44.523-BETA-arm64-v8a.zip",
+  "version": "v21.44.528-BETA (patches dev.2.mpp)",
+  "versionCode": 22,
+  "zipUrl": "https://github.com/rockstargamespk-max/revanced-magisk-module/releases/download/22/youtube-morphe-module-v21.44.528-BETA-arm64-v8a.zip",
   "changelog": "https://raw.githubusercontent.com/rockstargamespk-max/revanced-magisk-module/update/build.md"
 }
